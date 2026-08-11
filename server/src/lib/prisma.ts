@@ -6,10 +6,16 @@
 
 // export default prisma;
 import "dotenv/config";
-import { PrismaClient } from "@prisma/client";
+import * as PrismaPkg from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+
+// Handle environments where the Prisma client may be exported differently.
+const PrismaClient: any =
+  (PrismaPkg as any).PrismaClient || (PrismaPkg as any).default || PrismaPkg;
+
 const adapter = new PrismaPg({
   connectionString: process.env.DATABASE_URL!,
 });
+
 const prisma = new PrismaClient({ adapter });
 export default prisma;
