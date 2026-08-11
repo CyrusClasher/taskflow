@@ -1,18 +1,36 @@
-import { Request, Response } from 'express';
-import prisma from '../lib/prisma';
-import { AppError } from '../middleware/errorHandler';
-import { createTaskSchema, updateTaskSchema, updateTaskStatusSchema } from '../lib/validation';
+import { Request, Response } from "express";
+import prisma from "../lib/prisma";
+import { AppError } from "../middleware/errorHandler";
+import {
+  createTaskSchema,
+  updateTaskSchema,
+  updateTaskStatusSchema,
+} from "../lib/validation";
+
+const getParamString = (
+  param: string | string[] | undefined,
+): string | undefined => {
+  if (Array.isArray(param)) {
+    return param[0];
+  }
+  return param;
+};
 
 // GET /api/projects/:projectId/tasks
 export async function getTasksByProject(req: Request, res: Response) {
-  const project = await prisma.project.findUnique({ where: { id: req.params.projectId } });
+  const projectId = getParamString(req.params.projectId);
+  if (!projectId) {
+    throw new AppError(400, "Project ID is required");
+  }
+
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) {
-    throw new AppError(404, 'Project not found');
+    throw new AppError(404, "Project not found");
   }
 
   const tasks = await prisma.task.findMany({
-    where: { projectId: req.params.projectId },
-    orderBy: { createdAt: 'desc' },
+    where: { projectId },
+    orderBy: { createdAt: "desc" },
   });
 
   res.status(200).json({ success: true, data: tasks });
@@ -20,9 +38,14 @@ export async function getTasksByProject(req: Request, res: Response) {
 
 // POST /api/projects/:projectId/tasks
 export async function createTask(req: Request, res: Response) {
-  const project = await prisma.project.findUnique({ where: { id: req.params.projectId } });
+  const projectId = getParamString(req.params.projectId);
+  if (!projectId) {
+    throw new AppError(400, "Project ID is required");
+  }
+
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
   if (!project) {
-    throw new AppError(404, 'Project not found');
+    throw new AppError(404, "Project not found");
   }
 
   const data = createTaskSchema.parse(req.body);
@@ -30,7 +53,7 @@ export async function createTask(req: Request, res: Response) {
   const task = await prisma.task.create({
     data: {
       ...data,
-      projectId: req.params.projectId,
+      projectId,
     },
   });
 
@@ -39,10 +62,15 @@ export async function createTask(req: Request, res: Response) {
 
 // GET /api/tasks/:id
 export async function getTaskById(req: Request, res: Response) {
-  const task = await prisma.task.findUnique({ where: { id: req.params.id } });
+  const taskId = getParamString(req.params.id);
+  if (!taskId) {
+    throw new AppError(400, "Task ID is required");
+  }
+
+  const task = await prisma.task.findUnique({ where: { id: taskId } });
 
   if (!task) {
-    throw new AppError(404, 'Task not found');
+    throw new AppError(404, "Task not found");
   }
 
   res.status(200).json({ success: true, data: task });
@@ -50,15 +78,20 @@ export async function getTaskById(req: Request, res: Response) {
 
 // PUT /api/tasks/:id
 export async function updateTask(req: Request, res: Response) {
+  const taskId = getParamString(req.params.id);
+  if (!taskId) {
+    throw new AppError(400, "Task ID is required");
+  }
+
   const data = updateTaskSchema.parse(req.body);
 
-  const existing = await prisma.task.findUnique({ where: { id: req.params.id } });
+  const existing = await prisma.task.findUnique({ where: { id: taskId } });
   if (!existing) {
-    throw new AppError(404, 'Task not found');
+    throw new AppError(404, "Task not found");
   }
 
   const task = await prisma.task.update({
-    where: { id: req.params.id },
+    where: { id: taskId },
     data,
   });
 
@@ -67,12 +100,17 @@ export async function updateTask(req: Request, res: Response) {
 
 // DELETE /api/tasks/:id
 export async function deleteTask(req: Request, res: Response) {
-  const existing = await prisma.task.findUnique({ where: { id: req.params.id } });
-  if (!existing) {
-    throw new AppError(404, 'Task not found');
+  const taskId = getParamString(req.params.id);
+  if (!taskId) {
+    throw new AppError(400, "Task ID is required");
   }
 
-  await prisma.task.delete({ where: { id: req.params.id } });
+  const existing = await prisma.task.findUnique({ where: { id: taskId } });
+  if (!existing) {
+    throw new AppError(404, "Task not found");
+  }
+
+  await prisma.task.delete({ where: { id: taskId } });
 
   res.status(204).send();
 }
@@ -81,15 +119,20 @@ export async function deleteTask(req: Request, res: Response) {
 // A dedicated endpoint for the common "just move this task to another column"
 // action, so the frontend doesn't need to resend the whole task object.
 export async function updateTaskStatus(req: Request, res: Response) {
+  const taskId = getParamString(req.params.id);
+  if (!taskId) {
+    throw new AppError(400, "Task ID is required");
+  }
+
   const { status } = updateTaskStatusSchema.parse(req.body);
 
-  const existing = await prisma.task.findUnique({ where: { id: req.params.id } });
+  const existing = await prisma.task.findUnique({ where: { id: taskId } });
   if (!existing) {
-    throw new AppError(404, 'Task not found');
+    throw new AppError(404, "Task not found");
   }
 
   const task = await prisma.task.update({
-    where: { id: req.params.id },
+    where: { id: taskId },
     data: { status },
   });
 
